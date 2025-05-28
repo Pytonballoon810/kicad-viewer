@@ -9,7 +9,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
       <div v-if="isLoading" :class="$style.loadingContainer">
         <div :style="{ backgroundImage: `url('${appIconUrl}')` }"></div>
       </div>
-      <kicanvas-embed v-else controls="full" :class="$style.kicanvasEmbed">
+      <kicanvas-embed v-else controls="full" :class="$style.kicanvasEmbed" :src="src">
         <!-- Sources will be dynamically inserted here -->
       </kicanvas-embed>
     </section>
@@ -23,5 +23,5 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 <style
   module
   lang="scss"
-  src="./App.module.scss"
+  src="./styles/App.module.scss"
 ></style>

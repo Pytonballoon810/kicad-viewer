@@ -50,6 +50,7 @@ export default {
       isLoading: true,
       appIconUrl: generateFilePath(APP_ID, '', 'img/app.svg'),
       kicanvasEmbed: null,
+      src: null,
     };
   },
   mounted () {
@@ -64,20 +65,17 @@ export default {
   },
   methods: {
     destruct () {
-      // Clean up kicanvas embed
-      if (this.kicanvasEmbed) {
+      // Clean up any created blob URLs
+      if (this.src && this.src.startsWith('blob:')) {
         try {
-          // Remove source elements
-          while (this.kicanvasEmbed.firstChild) {
-            this.kicanvasEmbed.removeChild(
-              this.kicanvasEmbed.firstChild,
-            );
-          }
+          URL.revokeObjectURL(this.src);
+          enhancedLogger.debug('Revoked blob URL');
         } catch (error) {
-          enhancedLogger.debug('Error cleaning up KiCanvas:', error);
+          enhancedLogger.debug('Error revoking blob URL:', error);
         }
-        this.kicanvasEmbed = null;
       }
+      this.kicanvasEmbed = null;
+      this.src = null;
     },
     async construct () {
       this.isLoading = true;
@@ -98,12 +96,17 @@ export default {
           fileBasename,
         );
 
-        this.isLoading = false;
         enhancedLogger.debug('File content loaded, length:', fileContent.length);
 
-        // Initialize KiCanvas after the DOM is updated and loading is done
+        // Create a URL for the kicanvas-embed src
+        await this.createKiCadFileUrl(fileContent, fileExtension);
+
+        this.isLoading = false;
+
+        // Initialize KiCanvas reference after the DOM is updated and loading is done
         this.$nextTick(() => {
-          this.initKiCanvas(fileContent, fileExtension);
+          this.kicanvasEmbed = this.$el.querySelector('kicanvas-embed');
+          enhancedLogger.info('KiCanvas initialized successfully');
         });
       }
       catch (error) {
@@ -111,52 +114,43 @@ export default {
         this.isLoading = false;
       }
     },
-    initKiCanvas(fileContent, fileExtension) {
+    async createKiCadFileUrl(fileContent, fileExtension) {
       try {
-        enhancedLogger.debug('Initializing KiCanvas');
-        const container = this.$el.querySelector(
-          `.${this.$style.containCanvas}`,
-        );
-        this.kicanvasEmbed = container.querySelector('kicanvas-embed');
+        enhancedLogger.debug('Creating URL for KiCAD file');
+        const mimeType = this.getKiCadMimeType(fileExtension);
 
-        if (!this.kicanvasEmbed) {
-          enhancedLogger.error('KiCanvas embed element not found');
-          return;
-        }
-
-        // Clear any existing sources
-        while (this.kicanvasEmbed.firstChild) {
-          this.kicanvasEmbed.removeChild(this.kicanvasEmbed.firstChild);
-        }
-
-        // Create source element with proper file type
-        const sourceElement = document.createElement('kicanvas-source');
-        sourceElement.setAttribute('name', this.basename);
-        sourceElement.setAttribute('type', this.getKiCadMimeType(fileExtension));
-
-        // Load content safely with error boundary
-        try {
-          this.loadContentIntoKiCanvas(sourceElement, fileContent, fileExtension);
-        } catch (err) {
-          enhancedLogger.error('Error in loadContentIntoKiCanvas:', err);
-        }
-
-        // Add the source to the embed element
-        this.kicanvasEmbed.appendChild(sourceElement);
-
-        // Force KiCanvas to refresh/render
-        try {
-          if (typeof this.kicanvasEmbed.refresh === 'function') {
-            this.kicanvasEmbed.refresh();
-            enhancedLogger.debug('Called refresh() on kicanvas-embed');
+        // Try to create a blob URL (preferred method)
+        if (!window.kiCanvasBlobUrlsNotSupported) {
+          try {
+            const blob = new Blob([fileContent], { type: mimeType });
+            this.src = URL.createObjectURL(blob);
+            enhancedLogger.debug('Created Blob URL for KiCAD file');
+            return;
+          } catch (err) {
+            enhancedLogger.warn('Blob URL creation failed:', err.message);
+            window.kiCanvasBlobUrlsNotSupported = true;
           }
-        } catch (err) {
-          enhancedLogger.debug('Refresh not available:', err.message);
         }
 
-        enhancedLogger.info('KiCanvas initialized successfully');
+        // Fall back to data URL if blob URL fails
+        try {
+          // Convert to base64
+          const bytes = new TextEncoder().encode(fileContent);
+          let binary = '';
+          const chunkSize = 0x8000; // 32KB chunks to avoid call stack limits
+          for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+          }
+          const base64Content = btoa(binary);
+          this.src = `data:${mimeType};base64,${base64Content}`;
+          enhancedLogger.debug('Created Data URL for KiCAD file');
+        } catch (err) {
+          enhancedLogger.error('Failed to create file URL:', err);
+          this.src = null;
+        }
       } catch (error) {
-        enhancedLogger.error('Error initializing KiCanvas:', error);
+        enhancedLogger.error('Error creating KiCAD file URL:', error);
+        this.src = null;
       }
     },
     getKiCadMimeType(extension) {
@@ -171,99 +165,6 @@ export default {
       };
 
       return mimeMap[extension] || 'text/plain';
-    },
-    loadContentIntoKiCanvas(sourceElement, fileContent, fileExtension) {
-      // We'll still try multiple approaches, but in a more robust way
-      let loadSuccess = false;
-
-      // Approach 1: Direct content setting
-      if (!loadSuccess) {
-        try {
-          enhancedLogger.debug('Trying to set content directly');
-          if (typeof sourceElement.setContent === 'function') {
-            sourceElement.setContent(fileContent);
-            enhancedLogger.debug('Direct content setting successful');
-            loadSuccess = true;
-          }
-        } catch (err) {
-          enhancedLogger.debug('Direct content setting failed:', err.message);
-        }
-      }
-
-      // Approach 2: Data URL with proper mime type
-      if (!loadSuccess) {
-        try {
-          enhancedLogger.debug('Trying data URL approach');
-          // Get appropriate mime type for this file extension
-          const mimeType = this.getKiCadMimeType(fileExtension);
-
-          // Convert to base64 - handle Unicode correctly without deprecated unescape()
-          // Use a more robust approach that handles large files
-          const bytes = new TextEncoder().encode(fileContent);
-          let binary = '';
-          const chunkSize = 0x8000; // 32KB chunks to avoid call stack limits
-          for (let i = 0; i < bytes.length; i += chunkSize) {
-            binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-          }
-          const base64Content = btoa(binary);
-          const dataUrl = `data:${mimeType};base64,${base64Content}`;
-
-          // Set source attribute
-          sourceElement.setAttribute('src', dataUrl);
-          sourceElement.setAttribute('data-format', fileExtension);
-          enhancedLogger.debug('Data URL approach successful with mime type:', mimeType);
-          loadSuccess = true;
-        } catch (err) {
-          enhancedLogger.warn('Data URL approach failed:', err.message);
-        }
-      }
-
-      // Approach 3: Blob URL
-      if (!loadSuccess && !window.kiCanvasBlobUrlsNotSupported) {
-        try {
-          enhancedLogger.debug('Trying blob URL approach');
-
-          // Create blob with proper mime type
-          const mimeType = this.getKiCadMimeType(fileExtension);
-          const blob = new Blob([fileContent], { type: mimeType });
-
-          const fileUrl = URL.createObjectURL(blob);
-          enhancedLogger.debug('Created Blob URL for file content with mime type:', mimeType);
-
-          // Set source attribute
-          sourceElement.setAttribute('src', fileUrl);
-          sourceElement.setAttribute('data-format', fileExtension);
-
-          // Clean up the URL
-          window.setTimeout(() => {
-            try {
-              URL.revokeObjectURL(fileUrl);
-            } catch (e) {
-              // Ignore revocation errors
-            }
-          }, 30000);
-
-          loadSuccess = true;
-        } catch (err) {
-          enhancedLogger.warn('Blob URL approach failed:', err.message);
-          window.kiCanvasBlobUrlsNotSupported = true;
-        }
-      }
-
-      // Last resort: Set raw content
-      if (!loadSuccess) {
-        try {
-          enhancedLogger.debug('Falling back to setting raw content directly');
-          sourceElement.textContent = fileContent;
-          sourceElement.setAttribute('data-format', fileExtension);
-          enhancedLogger.debug('Set raw content with data-format:', fileExtension);
-          loadSuccess = true;
-        } catch (err) {
-          enhancedLogger.error('All content loading approaches failed');
-        }
-      }
-
-      return loadSuccess;
     },
     async fetchKiCadFile (url, filename) {
       try {
