@@ -21,7 +21,6 @@ class AddCspEventListener implements IEventListener {
 		$csp->addAllowedConnectDomain('blob:');
 		$csp->addAllowedStyleDomain('https://fonts.googleapis.com');
 		$csp->addAllowedFontDomain('https://fonts.gstatic.com');
-		$csp->allowEvalScript(true); // DEPR: see NC sources
 		$event->addPolicy($csp);
 	}
 }
