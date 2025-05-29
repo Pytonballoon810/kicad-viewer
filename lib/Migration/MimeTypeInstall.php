@@ -48,28 +48,58 @@ class MimeTypeInstall extends MimeTypeBase
 	private function inIcons()
 	{
 		$iconNames = array_keys(array_merge(self::EXT_MIME_MAP, self::EXT_ICON_EXTRA_MAP));
+		$mimeTypes = array_merge(self::EXT_MIME_MAP, self::EXT_ICON_EXTRA_MAP);
+		
+		// Source directory for SVG icons
+		$iconSourceDir = \OC_App::getAppPath('kicad_viewer') . '/src/img/icons-mime/dist';
+		
+		// Ensure the source directory exists
+		if (!is_dir($iconSourceDir)) {
+			// Try fallback to older path structure
+			$iconSourceDir = \OC_App::getAppPath('kicad_viewer') . '/img/icons-mime';
+			
+			// If still not found, log warning and exit
+			if (!is_dir($iconSourceDir)) {
+				error_log('KiCad Viewer: Icon directory not found, skipping icon registration.');
+				return;
+			}
+		}
+		
+		// Check if the generic icon exists
+		$genericSource = $iconSourceDir . '/gen.svg';
+		if (!file_exists($genericSource)) {
+			error_log('KiCad Viewer: Generic icon not found: ' . $genericSource);
+			return;
+		}
 
 		foreach ($iconNames as $iconName)
 		{
-			$source = __DIR__ . '/../../img/icons-mime/gen.svg';
-            $sourceSpec = __DIR__ . '/../../img/icons-mime/spec-' . $iconName . '.svg';
-			if (file_exists($sourceSpec)) {
-				$source = $sourceSpec;
+			// Default to generic icon
+			$specificSource = $iconSourceDir . '/' . $iconName . '.svg';
+			
+			// Create relative path for registration
+			$relativeIconPath = 'kicad_viewer/src/img/icons-mime/dist/';
+			$relativeIconPath .= file_exists($specificSource) ? $iconName . '.svg' : 'gen.svg';
+			
+			// Register MIME types with relative paths
+			if (isset($mimeTypes[$iconName])) {
+				foreach ($mimeTypes[$iconName] as $mime) {
+					try {
+						\OC::$server->getMimeTypeDetector()->registerType($mime, $relativeIconPath);
+					} catch (\Exception $e) {
+						error_log('KiCad Viewer: Failed to register MIME type ' . $mime . ' with icon ' . $relativeIconPath);
+					}
+				}
 			}
-            $target = \OC::$SERVERROOT . '/core/img/filetypes/' . $iconName . '.svg';
-            if (!file_exists($target) || md5_file($target) !== md5_file($source))
-            {
-                copy($source, $target);
-            }
 		}
 	}
 
 	public function run(IOutput $output)
 	{
 		$output->info('Installing MIME types...');
+		$this->inIcons();
 		$this->inFileCache();
 		$this->inConfigFiles();
-		$this->inIcons();
 		$output->info('...done.');
 	}
 }
