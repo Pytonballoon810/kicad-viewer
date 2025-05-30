@@ -130,5 +130,5 @@ dist
 .pnp.*
 
 # Build output
-/js
-/img
+/js*
+/img*
