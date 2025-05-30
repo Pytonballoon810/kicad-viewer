@@ -20,6 +20,6 @@ class LoadPublicViewerListener implements IEventListener {
 		if ($event->getResponse()->getRenderAs() !== TemplateResponse::RENDER_AS_PUBLIC) {
 			return;
 		}
-		Util::addScript(Application::APP_ID(), 'kicad_viewer');
+		Util::addScript(Application::APP_ID, 'kicad_viewer');
 	}
 }

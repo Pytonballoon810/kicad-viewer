@@ -10,5 +10,10 @@
       }
     ],
     "require": {},
-    "require-dev": {}
+    "require-dev": {},
+    "autoload": {
+        "psr-4": {
+            "OCA\\kicad_viewer\\": "lib/"
+        }
+    }
 }

@@ -70,3 +70,62 @@
 @keyframes spinner {
   to {transform: rotate(360deg);}
 }
+
+/* Force hide loading spinner when KiCanvas is ready */
+:global(.force-hidden) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: scale(0) !important;
+}
+
+/* Hide KiCanvas's own loading UI elements */
+:global(kicanvas-embed) {
+  /* Hide any loading overlays or spinners within KiCanvas */
+  :global(.loading),
+  :global(.spinner),
+  :global(.loading-overlay),
+  :global(.kc-loading),
+  :global(.kc-spinner),
+  :global([class*="loading"]),
+  :global([class*="spinner"]) {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+  
+  /* Hide shadow DOM loading elements if accessible */
+  :global(*[loading]),
+  :global(*[data-loading]) {
+    display: none !important;
+  }
+}
+
+/* Hide only the loading spinner pseudo-element, not the entire element */
+:global(.icon-loading::after) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  animation: none !important;
+  content: none !important;
+}
+
+/* More specific targeting within viewer */
+:global(.viewer) :global(.icon-loading::after) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  animation: none !important;
+  content: none !important;
+}
+
+/* Also hide any spinning animations on loading elements */
+:global([class*="loading"]) {
+  animation: none !important;
+}
+
+:global([class*="loading"]::after) {
+  animation: none !important;
+  content: none !important;
+}

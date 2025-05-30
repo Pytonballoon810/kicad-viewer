@@ -6,6 +6,20 @@ namespace Composer\Autoload;
 
 class ComposerStaticInita356d822be38ebe2d5868837aedb6129
 {
+    public static $prefixLengthsPsr4 = array (
+        'O' => 
+        array (
+            'OCA\\kicad_viewer\\' => 17,
+        ),
+    );
+
+    public static $prefixDirsPsr4 = array (
+        'OCA\\kicad_viewer\\' => 
+        array (
+            0 => __DIR__ . '/../..' . '/lib',
+        ),
+    );
+
     public static $classMap = array (
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
     );
@@ -13,6 +27,8 @@ class ComposerStaticInita356d822be38ebe2d5868837aedb6129
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
+            $loader->prefixLengthsPsr4 = ComposerStaticInita356d822be38ebe2d5868837aedb6129::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInita356d822be38ebe2d5868837aedb6129::$prefixDirsPsr4;
             $loader->classMap = ComposerStaticInita356d822be38ebe2d5868837aedb6129::$classMap;
 
         }, null, ClassLoader::class);

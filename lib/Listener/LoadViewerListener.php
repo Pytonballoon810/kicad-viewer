@@ -16,6 +16,6 @@ class LoadViewerListener implements IEventListener {
 		if (!$event instanceof LoadViewer) {
 			return;
 		}
-		Util::addScript(Application::APP_ID(), 'kicad_viewer', 'viewer');
+		Util::addScript(Application::APP_ID, 'kicad_viewer', 'viewer');
 	}
 }
